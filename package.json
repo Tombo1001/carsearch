@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Work out whether an older diesel would actually cost you money, by overlaying your own driving history on UK low-emission zones.",
+  "description": "Work out what an older car would actually cost you to drive, by overlaying your own driving history on the UK's clean-air, low-emission and congestion zones.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

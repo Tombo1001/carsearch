@@ -100,7 +100,7 @@ export default function App() {
       <header className="topbar">
         <div className="brand">
           <h1>carsearch</h1>
-          <small>would an older diesel actually cost you?</small>
+          <small>what would an older car actually cost you?</small>
         </div>
         <nav className="tabs" role="tablist">
           <button className="tab" role="tab" aria-selected={tab === 'zones'} onClick={() => setTab('zones')}>

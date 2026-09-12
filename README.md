@@ -1,8 +1,14 @@
 # carsearch
 
-**Would an older diesel actually cost you money?** Load your own Google Timeline
+**What would an older car actually cost you?** Load your own Google Timeline
 export, pick a car, and see which UK clean-air, low-emission and congestion zones
 you really drive through — and what they would charge you.
+
+It is not only older diesels that get charged. A petrol car has to be Euro 4, which
+in practice means registered from about January 2006 — so a cheap pre-2006 petrol is
+charged to enter the same zones a Euro 5 diesel is, for the same daily amount. The
+cut-offs differ by fuel (petrol Euro 4, diesel Euro 6, September 2015); the bill does
+not.
 
 Most advice about this is generic: *"a Euro 5 diesel pays £12.50 a day in London."*
 That is only useful if you know how often you are in London. This answers the
