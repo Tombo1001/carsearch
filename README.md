@@ -11,6 +11,8 @@ your actual driving, for a specific car.
 
 👉 **[tombo1001.github.io/carsearch](https://tombo1001.github.io/carsearch/)**
 
+[![Deploy to GitHub Pages](https://github.com/Tombo1001/carsearch/actions/workflows/pages.yml/badge.svg)](https://github.com/Tombo1001/carsearch/actions/workflows/pages.yml)
+
 ## Your location data never leaves your browser
 
 This is the important bit, so it is worth being precise rather than reassuring.

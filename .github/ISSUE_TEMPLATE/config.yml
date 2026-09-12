@@ -1,7 +1,10 @@
 blank_issues_enabled: true
 contact_links:
   - name: Is a charge or boundary wrong?
-    url: https://github.com/Tombo1001/carsearch/issues/new?labels=data
+    # Prefills a title rather than a label. Labels have to already exist on the
+    # repo, and GitHub drops unknown ones from this URL without saying so, which
+    # makes a label-based link quietly wrong on a fresh clone or a fork.
+    url: https://github.com/Tombo1001/carsearch/issues/new?title=Data+correction%3A+
     about: >-
       Zone charges and boundaries come from council and TfL feeds and go stale.
       Open an issue with a link to the authority's own page and it will be corrected.
