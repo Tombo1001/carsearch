@@ -1,0 +1,20 @@
+services:
+  carsearch:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: carsearch:local
+    container_name: carsearch
+    restart: unless-stopped
+    ports:
+      # Host port is the left-hand side; change it if 8080 is taken. The container
+      # always listens on 80 internally. See docs/running.md.
+      - "8080:80"
+    healthcheck:
+      # 127.0.0.1, not localhost: nginx here listens on IPv4 only, and inside the
+      # container localhost resolves to ::1 first, so the probe would always fail.
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s

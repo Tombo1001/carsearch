@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  A zone boundary with a route crossing it, which is the whole app in one glyph.
+  Uses the validated zone hues from styles.css: costly red for the boundary, blue
+  for the route. Drawn on a dark tile so it reads on both light and dark browser
+  chrome without needing a second file.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <rect width="64" height="64" rx="12" fill="#1a1a19"/>
+  <circle cx="32" cy="32" r="17" fill="#d03b3b" fill-opacity="0.18"
+          stroke="#d03b3b" stroke-width="3"/>
+  <path d="M8 46 C 22 46, 24 18, 38 18 L 56 18"
+        fill="none" stroke="#2a78d6" stroke-width="5"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

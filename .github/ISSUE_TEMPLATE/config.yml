@@ -1,0 +1,7 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Is a charge or boundary wrong?
+    url: https://github.com/Tombo1001/carsearch/issues/new?labels=data
+    about: >-
+      Zone charges and boundaries come from council and TfL feeds and go stale.
+      Open an issue with a link to the authority's own page and it will be corrected.

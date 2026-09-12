@@ -1,0 +1,9 @@
+node_modules
+dist
+tmp
+.git
+.vite
+*.log
+
+# Never bake personal location history into an image.
+data/manual

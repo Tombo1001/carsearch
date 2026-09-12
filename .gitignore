@@ -1,0 +1,33 @@
+node_modules/
+dist/
+tmp/
+.vite/
+*.local
+*.tsbuildinfo
+
+# Your own location history must never be committed.
+data/manual/*
+!data/manual/.gitkeep
+
+# Nothing below here should ever reach a public repo. Listed explicitly rather
+# than relied on, because the cost of one of these slipping through is not
+# symmetric with the cost of an over-broad ignore rule.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+id_rsa*
+id_ed25519*
+.npmrc
+.netrc
+
+# Local agent / editor config, which tends to carry paths and tokens.
+.claude/
+.mcp.json
+**/settings.local.json
+.vscode/
+.idea/
+
+*.tsbuildinfo
