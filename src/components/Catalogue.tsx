@@ -1,37 +1,57 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useState } from 'react'
 import { FUEL_LABELS, inferEuro } from '../lib/emissions'
 import type { Fuel, Zone } from '../lib/types'
 
-/** One row of the flattened catalogue, as written by scripts/build-catalogue.mjs. */
+/** One catalogue row, rebuilt from the columnar file written by scripts/build-catalogue.mjs. */
 interface Row {
-  id: string
   make: string
   model: string
+  /** DVLA's model string, e.g. "FIESTA ZETEC TURBO". Register rows only. */
+  variant: string | null
   generation: string | null
   yearFrom: number | null
   yearTo: number | null
-  body: string
+  body: string | null
   fuel: string
-  engine: string
+  engine: string | null
   engineCc: number | null
-  gearbox: string
-  gears: number | null
-  transmission: string
-  drivetrain: string
-  trims: string[]
+  gearbox: string | null
+  transmission: string | null
+  drivetrain: string | null
+  trims: string[] | null
+  /** Licensed cars in the latest DfT year. Register rows only. */
+  onRoad: number | null
+  euro: string | null
   provenance: string
-  euro?: string | null
-  power?: string | null
+  /** Lower-cased search text, built once rather than on every keystroke. */
+  hay: string
 }
 
-interface CatalogueData {
-  generatedAt: string
-  counts: { total: number; seed: number; imported: number }
-  facets: { makes: string[]; bodies: string[]; fuels: string[]; gearboxes: string[]; drivetrains: string[] }
-  rows: Row[]
+interface DftMeta {
+  page: string
+  releaseUpdatedAt: string
+  onRoadAsOf: string
+  minOnRoad: number
+  licence: string
 }
+
+interface CatalogueFile {
+  version: number
+  generatedAt: string
+  counts: { total: number; seed: number; dft: number; imported: number }
+  sources: { dft: DftMeta | null }
+  facets: { makes: string[]; bodies: string[]; fuels: string[]; gearboxes: string[]; drivetrains: string[] }
+  columns: string[]
+  rows: unknown[][]
+}
+
+type Source = '' | 'dft' | 'seed' | 'csv'
+type Sort = 'common' | 'newest' | 'az'
 
 const ANY = ''
+/** Rendering more than this is slow and nobody scrolls it; narrowing the filters is the answer. */
+const SHOW = 400
+
 const titleCase = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s)
 
 const DRIVETRAIN_LABELS: Record<string, string> = {
@@ -40,13 +60,34 @@ const DRIVETRAIN_LABELS: Record<string, string> = {
   awd: 'All-wheel drive',
 }
 
+const SOURCE_LABELS: Record<Exclude<Source, ''>, string> = {
+  dft: 'On UK roads (DfT register)',
+  seed: 'Detailed (hand-entered)',
+  csv: 'Your CSVs',
+}
+
+function toRows(file: CatalogueFile): Row[] {
+  const at = Object.fromEntries(file.columns.map((c, i) => [c, i]))
+  return file.rows.map((r) => {
+    const row = Object.fromEntries(file.columns.map((c) => [c, r[at[c]] ?? null])) as unknown as Row
+    row.hay = [row.make, row.model, row.variant, row.generation, row.engine, ...(row.trims ?? [])]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase()
+    return row
+  })
+}
+
+const sourceOf = (r: Row): Exclude<Source, ''> =>
+  r.provenance === 'dft' ? 'dft' : r.provenance === 'seed' ? 'seed' : 'csv'
+
 interface Props {
   /** Used to work out whether a given model year would be zone-compliant. */
   zones: Zone[]
 }
 
 export default function Catalogue({ zones }: Props) {
-  const [data, setData] = useState<CatalogueData | null>(null)
+  const [file, setFile] = useState<CatalogueFile | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const [q, setQ] = useState('')
@@ -55,15 +96,22 @@ export default function Catalogue({ zones }: Props) {
   const [fuel, setFuel] = useState(ANY)
   const [gearbox, setGearbox] = useState(ANY)
   const [drivetrain, setDrivetrain] = useState(ANY)
+  const [source, setSource] = useState<Source>(ANY)
   const [minYear, setMinYear] = useState('')
   const [ulezOnly, setUlezOnly] = useState(false)
+  const [sort, setSort] = useState<Sort>('common')
 
   useEffect(() => {
     fetch(`${import.meta.env.BASE_URL}data/catalogue.json`)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
-      .then(setData)
+      .then((f: CatalogueFile) => {
+        if (f.version !== 2) throw new Error('catalogue.json is an older format; run npm run data:catalogue')
+        setFile(f)
+      })
       .catch((e: Error) => setError(e.message))
   }, [])
+
+  const all = useMemo(() => (file ? toRows(file) : []), [file])
 
   /**
    * The earliest registration year that clears every active car-charging zone, per
@@ -90,31 +138,51 @@ export default function Catalogue({ zones }: Props) {
     return out
   }, [zones])
 
-  const rows = useMemo(() => {
-    if (!data) return []
-    const needle = q.trim().toLowerCase()
-    const min = Number(minYear) || 0
+  // Typing into search re-filters ~30k rows; deferring keeps the input itself responsive.
+  const needle = useDeferredValue(q.trim().toLowerCase())
 
-    return data.rows.filter((r) => {
+  const rows = useMemo(() => {
+    const min = Number(minYear) || 0
+    const hits = all.filter((r) => {
       if (make && r.make !== make) return false
       if (body && r.body !== body) return false
       if (fuel && r.fuel !== fuel) return false
       if (gearbox && r.gearbox !== gearbox) return false
       if (drivetrain && r.drivetrain !== drivetrain) return false
+      if (source && sourceOf(r) !== source) return false
       if (min && (r.yearTo ?? 2100) < min) return false
       if (ulezOnly) {
         const from = compliantFrom[r.fuel]
-        // Keep the row if the generation was still on sale once it was compliant.
+        // Keep the row if cars of it were still being registered once they were compliant.
         if (from === undefined) return false
         if ((r.yearTo ?? 2100) < from) return false
       }
-      if (needle) {
-        const hay = `${r.make} ${r.model} ${r.generation ?? ''} ${r.engine} ${r.trims.join(' ')}`.toLowerCase()
-        if (!hay.includes(needle)) return false
-      }
+      if (needle && !needle.split(/\s+/).every((w) => r.hay.includes(w))) return false
       return true
     })
-  }, [data, q, make, body, fuel, gearbox, drivetrain, minYear, ulezOnly, compliantFrom])
+
+    const cmp: Record<Sort, (a: Row, b: Row) => number> = {
+      // Register rows carry a real count; hand-entered rows have none, so they sort after.
+      common: (a, b) => (b.onRoad ?? -1) - (a.onRoad ?? -1),
+      newest: (a, b) => (b.yearTo ?? 9999) - (a.yearTo ?? 9999) || (b.yearFrom ?? 0) - (a.yearFrom ?? 0),
+      az: (a, b) =>
+        a.make.localeCompare(b.make) || a.model.localeCompare(b.model) || (a.variant ?? '').localeCompare(b.variant ?? ''),
+    }
+    return hits.sort(cmp[sort])
+  }, [all, needle, make, body, fuel, gearbox, drivetrain, source, minYear, ulezOnly, compliantFrom, sort])
+
+  const reset = () => {
+    setQ('')
+    setMake(ANY)
+    setBody(ANY)
+    setFuel(ANY)
+    setGearbox(ANY)
+    setDrivetrain(ANY)
+    setSource(ANY)
+    setMinYear('')
+    setUlezOnly(false)
+    setSort('common')
+  }
 
   if (error) {
     return (
@@ -126,22 +194,30 @@ export default function Catalogue({ zones }: Props) {
       </div>
     )
   }
-  if (!data) return <div className="catalogue empty">Loading catalogue&hellip;</div>
+  if (!file) return <div className="catalogue empty">Loading catalogue&hellip;</div>
+
+  const dft = file.sources.dft
+  const detailFilterOn = Boolean(body || gearbox || drivetrain)
 
   return (
     <div className="catalogue">
       <div className="stack" style={{ marginBottom: 14 }}>
         <div className="row wrap" style={{ justifyContent: 'space-between' }}>
-          <h2>UK models, engines and trims</h2>
+          <h2>Cars on UK roads</h2>
           <span className="small muted">
-            {rows.length.toLocaleString()} of {data.rows.length.toLocaleString()} variants
+            {rows.length.toLocaleString()} of {all.length.toLocaleString()} variants
           </span>
         </div>
-        <p className="small secondary" style={{ margin: 0, maxWidth: 720 }}>
-          Browse by specification rather than by what happens to be for sale, then take the shortlist to the
-          listings. Rows marked <em>seed</em> are hand-entered at generation level and are a starting point,
-          not a spec sheet &mdash; verify the individual car. Drop your own CSVs into <code>data/manual/</code>{' '}
-          and re-run <code>npm run data:catalogue</code> to extend it.
+        <p className="small secondary" style={{ margin: 0, maxWidth: 780 }}>
+          Every car model with at least {dft?.minOnRoad ?? 50} still licensed in the UK, from the DVLA register,
+          plus hand-entered detail for popular generations. Browse by specification rather than by what happens
+          to be for sale, then take the shortlist to the listings.
+        </p>
+        <p className="small muted" style={{ margin: 0, maxWidth: 780 }}>
+          <strong>Years</strong> on register rows are when cars of that model were first registered, which is
+          what decides a car&rsquo;s likely Euro standard. They are per DVLA model name, not per engine. DVLA
+          records engine size in 100&nbsp;cc bands and does not record body shape; gearbox and drive are shown
+          only where the model name says so. Verify the individual car.
         </p>
       </div>
 
@@ -150,33 +226,49 @@ export default function Catalogue({ zones }: Props) {
           Search
           <input
             type="search"
-            placeholder="Golf, TDI, ST-Line&hellip;"
+            placeholder="Golf TDI, 320d, Model 3&hellip;"
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
         </label>
 
-        <Select label="Make" value={make} onChange={setMake} options={data.facets.makes} />
-        <Select label="Shape" value={body} onChange={setBody} options={data.facets.bodies} format={titleCase} />
+        <Select label="Make" value={make} onChange={setMake} options={file.facets.makes} />
         <Select
           label="Fuel"
           value={fuel}
           onChange={setFuel}
-          options={data.facets.fuels}
+          options={file.facets.fuels}
           format={(f) => FUEL_LABELS[f as Fuel] ?? titleCase(f)}
         />
-        <Select label="Gearbox" value={gearbox} onChange={setGearbox} options={data.facets.gearboxes} format={titleCase} />
+        <Select label="Shape" value={body} onChange={setBody} options={file.facets.bodies} format={titleCase} />
+        <Select label="Gearbox" value={gearbox} onChange={setGearbox} options={file.facets.gearboxes} format={titleCase} />
         <Select
           label="Drive"
           value={drivetrain}
           onChange={setDrivetrain}
-          options={data.facets.drivetrains}
+          options={file.facets.drivetrains}
           format={(d) => DRIVETRAIN_LABELS[d] ?? d.toUpperCase()}
+        />
+        <Select
+          label="Source"
+          value={source}
+          onChange={(v) => setSource(v as Source)}
+          options={(['dft', 'seed', 'csv'] as const).filter((s) => s !== 'csv' || file.counts.imported > 0)}
+          format={(s) => SOURCE_LABELS[s as Exclude<Source, ''>]}
         />
 
         <label className="field" style={{ width: 110 }}>
-          On sale from
+          Available from
           <input type="number" placeholder="e.g. 2016" value={minYear} onChange={(e) => setMinYear(e.target.value)} />
+        </label>
+
+        <label className="field" style={{ width: 140 }}>
+          Sort
+          <select value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
+            <option value="common">Most common</option>
+            <option value="newest">Newest</option>
+            <option value="az">Make A&ndash;Z</option>
+          </select>
         </label>
 
         <label className="check" style={{ paddingBottom: 8 }}>
@@ -184,23 +276,17 @@ export default function Catalogue({ zones }: Props) {
           <span>Zone-compliant only</span>
         </label>
 
-        <button
-          className="ghost"
-          style={{ marginBottom: 8 }}
-          onClick={() => {
-            setQ('')
-            setMake(ANY)
-            setBody(ANY)
-            setFuel(ANY)
-            setGearbox(ANY)
-            setDrivetrain(ANY)
-            setMinYear('')
-            setUlezOnly(false)
-          }}
-        >
+        <button className="ghost" style={{ marginBottom: 8 }} onClick={reset}>
           Reset
         </button>
       </div>
+
+      {detailFilterOn && (
+        <div className="note" style={{ marginBottom: 12, maxWidth: 780 }}>
+          Shape, gearbox and drive filters only match cars whose data records them, so most register rows are
+          hidden while one is set.
+        </div>
+      )}
 
       <div className="table-wrap">
         <table>
@@ -210,36 +296,49 @@ export default function Catalogue({ zones }: Props) {
               <th>Years</th>
               <th>Engine</th>
               <th>Fuel</th>
-              <th>Gearbox</th>
-              <th>Drive</th>
+              <th>Gearbox &amp; drive</th>
               <th>Shape</th>
+              <th className="num" title={dft ? `Licensed cars, ${dft.onRoadAsOf}` : undefined}>
+                On the road
+              </th>
               <th>UK trims</th>
             </tr>
           </thead>
           <tbody>
-            {rows.slice(0, 400).map((r) => (
-              <tr key={r.id}>
+            {rows.slice(0, SHOW).map((r, i) => (
+              <tr key={`${r.provenance}|${r.make}|${r.model}|${r.variant ?? r.generation}|${r.engine}|${r.transmission}|${i}`}>
                 <td>
                   <strong>
                     {r.make} {r.model}
                   </strong>
                   {r.generation && <span className="muted"> {r.generation}</span>}
+                  {r.variant && <div className="variant">{r.variant}</div>}
                 </td>
                 <td className="num">
                   {r.yearFrom ?? '?'}&ndash;{r.yearTo ?? 'now'}
                 </td>
                 <td>
-                  {r.engine}
+                  {r.engine ?? <span className="muted">&mdash;</span>}
                   {r.engineCc ? <span className="muted small"> {r.engineCc}cc</span> : null}
                 </td>
                 <td>{FUEL_LABELS[r.fuel as Fuel] ?? titleCase(r.fuel)}</td>
-                <td>{r.transmission}</td>
-                <td>{r.drivetrain ? r.drivetrain.toUpperCase() : '—'}</td>
-                <td>{titleCase(r.body)}</td>
                 <td>
-                  <div className="trim-list">
-                    {r.trims.length ? r.trims.map((t) => <span key={t}>{t}</span>) : <span className="muted">—</span>}
-                  </div>
+                  {[r.transmission || (r.gearbox && titleCase(r.gearbox)), r.drivetrain?.toUpperCase()]
+                    .filter(Boolean)
+                    .join(', ') || <span className="muted">&mdash;</span>}
+                </td>
+                <td>{r.body ? titleCase(r.body) : <span className="muted">&mdash;</span>}</td>
+                <td className="num">{r.onRoad !== null ? r.onRoad.toLocaleString() : <span className="muted">&mdash;</span>}</td>
+                <td>
+                  {r.trims?.length ? (
+                    <div className="trim-list">
+                      {r.trims.map((t) => (
+                        <span key={t}>{t}</span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="muted">&mdash;</span>
+                  )}
                 </td>
               </tr>
             ))}
@@ -247,10 +346,24 @@ export default function Catalogue({ zones }: Props) {
         </table>
 
         {rows.length === 0 && <div className="empty">Nothing matches those filters.</div>}
-        {rows.length > 400 && (
-          <div className="empty small">Showing the first 400 of {rows.length.toLocaleString()}. Narrow the filters.</div>
+        {rows.length > SHOW && (
+          <div className="empty small">
+            Showing the first {SHOW} of {rows.length.toLocaleString()}. Narrow the filters.
+          </div>
         )}
       </div>
+
+      {dft && (
+        <p className="small muted" style={{ margin: '12px 0 0' }}>
+          Register data:{' '}
+          <a href={dft.page} target="_blank" rel="noopener noreferrer">
+            DfT vehicle licensing statistics
+          </a>
+          , licensed cars at the {dft.onRoadAsOf}, release published{' '}
+          {new Date(dft.releaseUpdatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}.
+          Contains public sector information licensed under the {dft.licence}.
+        </p>
+      )}
     </div>
   )
 }
@@ -265,7 +378,7 @@ function Select({
   label: string
   value: string
   onChange: (v: string) => void
-  options: string[]
+  options: readonly string[]
   format?: (s: string) => string
 }) {
   return (

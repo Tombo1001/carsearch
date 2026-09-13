@@ -67,6 +67,20 @@ one is published, and are simplified to a tolerance finer than consumer GPS nois
 few zones publish no open boundary and are drawn as approximate discs, dashed on the
 map and labelled as such.
 
+A weekly check re-fetches every boundary, watches each authority's own page for
+changes to charges, and watches GOV.UK and mygov.scot for new zones. Charges are
+never updated by machine - a person reads what changed. See
+[docs/data.md](docs/data.md).
+
+## The car catalogue
+
+The Catalogue tab lists **every car model with at least 50 still licensed in the
+UK** - around 29,000 variants across 100+ makes, covering about 99% of the cars on
+the road - from DfT's vehicle licensing statistics. Each shows its fuel, engine size
+band, how many are licensed today, and the years it was first registered, which is
+what decides its likely Euro standard. Popular generations also carry hand-entered
+body shapes, gearboxes and trims.
+
 **This is a planning tool, not legal advice.** Charges change. The date the charges
 were checked is shown in the app; verify with the authority before spending money on
 a car.
@@ -92,8 +106,9 @@ npm install
 npm run dev
 ```
 
-See [docs/running.md](docs/running.md) for Docker and for regenerating the zone data,
-and [docs/deploying.md](docs/deploying.md) for GitHub Pages.
+See [docs/running.md](docs/running.md) for Docker, [docs/data.md](docs/data.md) for
+where the data comes from and how it is kept current, and
+[docs/deploying.md](docs/deploying.md) for GitHub Pages.
 
 **If you fork this and put it online, change the tile provider first.** The default
 uses OpenStreetMap's volunteer tile servers, which their usage policy does not permit
@@ -109,6 +124,9 @@ fix it.
 
 [MIT](LICENSE) for the code.
 
+Vehicle data contains public sector information from the Department for Transport,
+licensed under the
+[Open Government Licence v3.0](https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/).
 The zone boundaries are derived from public sector data published under the
 [Open Government Licence v3](https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/)
 (v2 for some London Datastore sets) and remain subject to it. Map data is

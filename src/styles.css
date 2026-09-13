@@ -569,6 +569,16 @@ tbody tr:hover {
   color: var(--text-secondary);
 }
 
+/* DVLA's own model string under the tidied make and model. It is shouty and
+   abbreviated by nature, so it is set small and muted rather than prettified -
+   rewriting "SE BLUEMOTION TECH TDI" risks making it wrong. */
+.variant {
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
 .empty {
   padding: 40px 16px;
   text-align: center;

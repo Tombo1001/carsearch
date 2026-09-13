@@ -72,6 +72,17 @@ export default function MapView({ zones, impacts, timeline, focusZoneId }: Props
 
   const impactById = useMemo(() => new Map(impacts.map((i) => [i.zone.id, i])), [impacts])
 
+  /**
+   * The latest zones and impacts, for the map's event handlers.
+   *
+   * The map is created once, so a handler registered in that effect sees the props
+   * of the very first render - when zones.json has not loaded yet and `zones` is
+   * empty. Reading props directly there meant every click looked up a zone in an
+   * empty list and no popup ever opened. Handlers read these refs instead.
+   */
+  const latest = useRef({ zones, impactById })
+  latest.current = { zones, impactById }
+
   const zoneFeatures = useMemo(
     () => ({
       type: 'FeatureCollection' as const,
@@ -190,9 +201,16 @@ export default function MapView({ zones, impacts, timeline, focusZoneId }: Props
     })
 
     m.on('click', 'zone-fill', (e) => {
-      const f = e.features?.[0]
-      if (!f) return
-      const zone = zones.find((z) => z.id === f.properties?.id)
+      const { zones, impactById } = latest.current
+      const hits = (e.features ?? [])
+        .map((f) => zones.find((z) => z.id === f.properties?.id))
+        .filter((z): z is Zone => Boolean(z))
+      // Zones stack - central London is inside the LEZ, ULEZ and Congestion Charge at
+      // once. Whichever happens to draw on top is arbitrary, and here it is the LEZ,
+      // which does not apply to cars. Prefer zones that do, then the smallest, which
+      // is the most specific thing under the cursor.
+      const area = (z: Zone) => (z.bbox[2] - z.bbox[0]) * (z.bbox[3] - z.bbox[1])
+      const zone = hits.sort((a, b) => Number(b.affectsCars) - Number(a.affectsCars) || area(a) - area(b))[0]
       if (zone) {
         new maplibregl.Popup({ closeButton: true, maxWidth: '320px' })
           .setLngLat(e.lngLat)
@@ -301,6 +319,11 @@ function popupHtml(zone: Zone, impact: ZoneImpact | undefined): string {
     <dl>${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
     ${zone.notes ? `<p class="small secondary" style="margin:8px 0 0">${esc(zone.notes)}</p>` : ''}
     ${approx}
-    <p class="small" style="margin:8px 0 0"><a href="${esc(safeHref(zone.source.url))}" target="_blank" rel="noopener noreferrer">${esc(zone.source.name)}</a></p>
+    ${
+      zone.info
+        ? `<p class="small" style="margin:8px 0 0">Charges and exemptions: <a href="${esc(safeHref(zone.info.url))}" target="_blank" rel="noopener noreferrer">${esc(zone.info.name)}</a></p>`
+        : ''
+    }
+    <p class="small muted" style="margin:4px 0 0">Boundary data: <a href="${esc(safeHref(zone.source.url))}" target="_blank" rel="noopener noreferrer">${esc(zone.source.name)}</a></p>
   `
 }

@@ -27,7 +27,10 @@ export interface Zone {
   standards: { petrol?: string; diesel?: string; hgv?: string } | null
   notes?: string
   precision: Precision
+  /** Where the boundary data came from. */
   source: { name: string; url: string; licence: string }
+  /** The authority's own page - current charges, hours and exemptions. */
+  info?: { name: string; url: string }
   bbox: [number, number, number, number]
   geometry: MultiPolygonCoords
 }

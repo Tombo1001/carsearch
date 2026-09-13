@@ -37,7 +37,7 @@ export const ZONE_SOURCES = [
     hours: '24/7, every day of the year',
     standards: CAR_STANDARD,
     notes:
-      'Covers every London borough. Diesel cars generally need to be registered from September 2015 to be Euro 6.',
+      'Covers every London borough. Petrol cars generally need to be registered from 2006 to be Euro 4, and diesel cars from September 2015 to be Euro 6.',
     geometry: {
       kind: 'geojson',
       url: 'https://data.london.gov.uk/download/vd455/0cab9a8b-ca8a-47b0-aaf8-0e77a9041a19/LondonWideUltraLowEmissionZone.geojson',
@@ -63,13 +63,13 @@ export const ZONE_SOURCES = [
     // so it is excluded from the "would an older car cost me more?" comparison.
     emissionsBased: false,
     enforcement: 'charge',
-    carDailyCharge: 15,
+    carDailyCharge: 18,
     penalty: { amount: 180, reducedAmount: 90 },
-    hours: 'Mon-Fri 07:00-18:00, Sat-Sun 12:00-18:00 (not 25 Dec to 1 Jan)',
+    hours: "Mon-Fri 07:00-18:00, Sat-Sun and bank holidays 12:00-18:00 (not Christmas Day to the New Year's Day bank holiday)",
     standards: null,
     notes:
-      'VERIFY THE RATE before relying on it - TfL has consulted on increasing the daily charge. ' +
-      'Shown for context only; it is age-blind, so it does not change the old-vs-new diesel decision.',
+      '21 pounds if paid by midnight on the third day after travel instead of on the day. ' +
+      'Shown for context only; it is age-blind, so it does not change the old-versus-new decision.',
     geometry: {
       kind: 'arcgis',
       url: 'https://services1.arcgis.com/YswvgzOodUvqkoCN/arcgis/rest/services/Congestion_Charge_Zone/FeatureServer/8',
@@ -192,7 +192,7 @@ export const ZONE_SOURCES = [
     precision: 'official',
     source: {
       name: 'City of Bradford MDC - Clean Air Zone Boundary',
-      url: 'https://www.data.gov.uk/dataset/7235c856-557d-4def-9b7f-02cc86260149/clean-air-zone-boundary',
+      url: 'https://www.data.gov.uk/dataset/43bf7a5b-51a1-4c85-b5a9-7071da4b240c/clean-air-zone-boundary5',
       licence: 'Open Government Licence v3',
     },
   },
@@ -220,7 +220,7 @@ export const ZONE_SOURCES = [
     precision: 'official',
     source: {
       name: 'Sheffield City Council Open Data - Clean Air Zone Boundary',
-      url: 'https://sheffieldcitycouncil.cloud.esriuk.com/server/rest/services/AGOL/OpenData/MapServer/28',
+      url: 'https://www.data.gov.uk/dataset/6ab87962-cc5e-43c6-85a7-53bf8e693d43/sheffield-clean-air-zone',
       licence: 'Open Government Licence v3',
     },
   },
@@ -245,7 +245,7 @@ export const ZONE_SOURCES = [
     precision: 'approximate',
     source: {
       name: 'Bath & North East Somerset Council (no open boundary found, disc approximation)',
-      url: 'https://beta.bathnes.gov.uk/bath-clean-air-zone',
+      url: 'https://www.bathnes.gov.uk/baths-clean-air-zone',
       licence: 'n/a - approximation',
     },
   },
@@ -270,7 +270,7 @@ export const ZONE_SOURCES = [
     precision: 'approximate',
     source: {
       name: 'Portsmouth City Council (no open boundary found, disc approximation)',
-      url: 'https://www.portsmouth.gov.uk/services/transport-and-parking/clean-air-zone/',
+      url: 'https://cleanerairportsmouth.co.uk/',
       licence: 'n/a - approximation',
     },
   },
@@ -404,7 +404,7 @@ export const ZONE_SOURCES = [
     standards: CAR_STANDARD,
     notes:
       'Scotland has no daily charge - a non-compliant vehicle is banned outright and penalised. ' +
-      'Treat any trip through here in an older diesel as "cannot do", not "costs a few pounds".',
+      'Treat any trip through here in a non-compliant car as "cannot do", not "costs a few pounds".',
     ...z,
   })),
 ]
@@ -415,3 +415,57 @@ export const ZONE_SOURCES = [
  * same shape with status: 'proposed' - the build script and the UI already handle them.
  */
 export const PROPOSED_ZONE_SOURCES = []
+
+/**
+ * The authority's own public page for each zone: where a driver should go to read
+ * the current charges, and what `npm run data:check` watches for changes.
+ *
+ * Kept apart from `source`, which records where the *boundary data* came from.
+ * They were one link before, which meant a map popup could send a driver to a raw
+ * ArcGIS endpoint to find out what a zone costs. Every URL here was confirmed to
+ * resolve on 2026-09-13; the check re-confirms them weekly.
+ */
+export const ZONE_INFO = {
+  'london-ulez': { name: 'TfL - Ultra Low Emission Zone', url: 'https://tfl.gov.uk/modes/driving/ultra-low-emission-zone' },
+  'london-ccz': { name: 'TfL - Congestion Charge', url: 'https://tfl.gov.uk/modes/driving/congestion-charge' },
+  'london-lez': { name: 'TfL - Low Emission Zone', url: 'https://tfl.gov.uk/modes/driving/low-emission-zone' },
+  'birmingham-caz': { name: 'Brum Breathes - charges and operation', url: 'https://www.brumbreathes.co.uk/info/32/charges-operation' },
+  'bristol-caz': { name: "Bristol City Council - Bristol's Clean Air Zone", url: 'https://www.bristol.gov.uk/residents/streets-travel/bristols-caz' },
+  'bradford-caz': { name: 'Bradford Council - Clean Air Zone', url: 'https://www.bradford.gov.uk/clean-air-zone/clean-air-zone/' },
+  'sheffield-caz': { name: 'Sheffield City Council - Clean Air Zone', url: 'https://www.sheffield.gov.uk/clean-air-zone-sheffield' },
+  'bath-caz': { name: "Bath & North East Somerset Council - Bath's Clean Air Zone", url: 'https://www.bathnes.gov.uk/baths-clean-air-zone' },
+  'portsmouth-caz': { name: 'Cleaner Air Portsmouth - charges', url: 'https://cleanerairportsmouth.co.uk/charges/' },
+  'tyneside-caz': { name: 'Breathe Clean Air - Newcastle and Gateshead', url: 'https://www.breathe-cleanair.com/' },
+  'greater-manchester-caz': { name: 'Clean Air Greater Manchester', url: 'https://cleanairgm.com/' },
+  'glasgow-lez': { name: 'Glasgow City Council - Low Emission Zone', url: 'https://www.glasgow.gov.uk/LEZ' },
+  'edinburgh-lez': { name: 'City of Edinburgh Council - Low emission zone', url: 'https://www.edinburgh.gov.uk/lez' },
+  'dundee-lez': {
+    name: 'Dundee City Council - Low Emission Zone scheme',
+    url: 'https://www.dundeecity.gov.uk/service-area/city-development/sustainable-transport-and-roads/dundee-low-emission-zone-scheme-lez',
+  },
+  'aberdeen-lez': {
+    name: 'Aberdeen City Council - Low Emission Zone',
+    url: 'https://www.aberdeencity.gov.uk/Council-Services/roads-parking-and-travel/low-emission-zone-lez',
+  },
+}
+
+/**
+ * National listings, watched for zones this registry does not know about yet.
+ * `names` are the places each page lists today; a place appearing that is not in
+ * this list is reported as a possible new zone.
+ */
+export const NATIONAL_LISTINGS = [
+  {
+    id: 'england-caz',
+    name: 'GOV.UK - Driving in a clean air zone',
+    govukPath: 'guidance/driving-in-a-clean-air-zone',
+    url: 'https://www.gov.uk/guidance/driving-in-a-clean-air-zone',
+    names: ['Bath', 'Birmingham', 'Bradford', 'Bristol', 'Portsmouth', 'Sheffield', 'Tyneside'],
+  },
+  {
+    id: 'scotland-lez',
+    name: 'mygov.scot - Low emission zones',
+    url: 'https://www.mygov.scot/low-emission-zones',
+    names: ['Aberdeen', 'Dundee', 'Edinburgh', 'Glasgow'],
+  },
+]

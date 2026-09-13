@@ -50,8 +50,12 @@ neither needs any network beyond npm. Regenerate it when you want fresher data:
 
 ```bash
 npm run data:zones        # re-fetches every boundary from its official source
-npm run data:catalogue    # re-expands the seed + anything in data/manual/*.csv
+npm run data:catalogue    # DfT register + seed + data/manual/*.csv (first run downloads ~136 MB)
+npm run data:check        # reports what is out of date, changes nothing
 ```
+
+Where each dataset comes from, and the weekly check that keeps them current, is in
+[data.md](data.md).
 
 `npm run data:zones` is the one to re-run periodically: it pulls live from TfL, the
 London Datastore and the council ArcGIS services. It prints one line per zone and

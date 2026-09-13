@@ -15,10 +15,12 @@ import { writeFile, mkdir } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import proj4 from 'proj4'
-import { ZONE_SOURCES, PROPOSED_ZONE_SOURCES, CHARGES_AS_OF } from './zone-sources.mjs'
+import { ZONE_SOURCES, PROPOSED_ZONE_SOURCES, CHARGES_AS_OF, ZONE_INFO } from './zone-sources.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const OUT = resolve(ROOT, 'public/data/zones.json')
+/** `--out <path>` lets the data check build a candidate file without touching the real one. */
+const outArg = process.argv.indexOf('--out')
+const OUT = outArg > -1 ? resolve(process.argv[outArg + 1]) : resolve(ROOT, 'public/data/zones.json')
 
 /** Simplification tolerance. ~15 m is below consumer GPS noise, so it costs no real accuracy. */
 const SIMPLIFY_METRES = 15
@@ -203,6 +205,8 @@ async function resolveGeometry(src, built) {
 
 async function build() {
   const sources = [...ZONE_SOURCES, ...PROPOSED_ZONE_SOURCES]
+  const missingInfo = sources.filter((z) => !ZONE_INFO[z.id]).map((z) => z.id)
+  if (missingInfo.length) throw new Error(`no ZONE_INFO entry for: ${missingInfo.join(', ')}`)
   const built = new Map()
   const failures = []
 
@@ -218,6 +222,7 @@ async function build() {
       const { geometry, ...meta } = src
       built.set(src.id, {
         ...meta,
+        info: ZONE_INFO[src.id],
         bbox: bboxOf(polys),
         geometry: polys,
       })
