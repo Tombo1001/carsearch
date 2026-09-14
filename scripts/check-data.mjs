@@ -21,6 +21,10 @@
  *                    press release from a tariff change, and pretending otherwise
  *                    would put wrong charges in front of people deciding what car
  *                    to buy.
+ *
+ * All fetching goes through scripts/lib/polite-fetch.mjs: robots.txt is obeyed,
+ * Crawl-delay is honoured, and a refusal is final. Pages a site will not serve to
+ * this check are listed for checking by hand - never retried around.
  */
 
 import { execFile } from 'node:child_process'
@@ -31,6 +35,7 @@ import { promisify } from 'node:util'
 import { CHARGES_AS_OF, NATIONAL_LISTINGS, ZONE_INFO, ZONE_SOURCES } from './zone-sources.mjs'
 import { dftRelease } from './dft-vehicles.mjs'
 import { govukContent } from './lib/govuk.mjs'
+import { politeFetch, RobotsDisallowed } from './lib/polite-fetch.mjs'
 
 const run = promisify(execFile)
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -46,16 +51,11 @@ const TODAY = new Date().toISOString().slice(0, 10)
 /** Charges older than this get flagged for a manual re-verification pass. */
 const CHARGES_MAX_AGE_DAYS = 120
 
-/**
- * Identifies the check honestly, in the form crawlers conventionally use. The
- * "Mozilla/5.0 (compatible; ...)" prefix is not disguise - it is the shape bot walls
- * expect from a well-behaved client (Googlebot sends the same), and Glasgow's site
- * returns 403 to an agent without it.
- */
-const USER_AGENT = 'Mozilla/5.0 (compatible; carsearch-data-check/1.0; +https://github.com/Tombo1001/carsearch)'
 
 /** A human has to look at these. Anything here makes CI open an issue or PR. */
 const review = []
+/** Pages the check may not or cannot read. Listed every run, never escalated. */
+const byHand = []
 /** Informational: applied automatically, or probably transient. */
 const notes = []
 const sections = []
@@ -135,6 +135,12 @@ async function checkBoundaries() {
     notes.push(`${plural(candidate.failures.length, 'boundary fetch')} failed; previous boundaries kept.`)
   }
 
+  for (const r of candidate.retained ?? []) {
+    lines.push(
+      `- **Not refreshed:** ${r.name} - its data service's robots.txt excludes automated clients, so the ` +
+        `official boundary from ${r.keptFrom?.slice(0, 10) ?? 'the last build'} is kept. Refresh it by hand: see docs/data.md.`,
+    )
+  }
   if (!lines.length) lines.push(`All ${candidate.zones.length} boundaries match their official sources.`)
   sections.push(['Boundaries', lines])
 
@@ -188,29 +194,18 @@ function decodeEntities(s) {
 }
 
 /**
- * Fetches a page, retrying the failures that are usually momentary. Some council
- * sites sit behind bot scoring that answers the same request 200 one moment and
- * 403 the next, so a single refusal is not treated as an answer.
+ * Fetches a page for watching. Only a plain 200 counts: bot-protection services
+ * answer 202 with a challenge page, and treating that as content would record the
+ * challenge as the baseline.
  */
 async function fetchPage(url) {
-  const delays = [0, 3_000, 8_000]
-  let last
-  for (const wait of delays) {
-    if (wait) await new Promise((r) => setTimeout(r, wait))
-    try {
-      const res = await fetch(url, {
-        redirect: 'follow',
-        signal: AbortSignal.timeout(45_000),
-        headers: { 'user-agent': USER_AGENT, accept: 'text/html,application/xhtml+xml' },
-      })
-      last = { status: res.status, finalUrl: res.url, html: res.ok ? await res.text() : '' }
-      const transient = res.status === 403 || res.status === 429 || res.status >= 500
-      if (!transient) return last
-    } catch (err) {
-      last = { status: 0, finalUrl: url, html: '', error: err.cause?.code || err.name || String(err) }
-    }
+  try {
+    const res = await politeFetch(url, { timeoutMs: 45_000, headers: { accept: 'text/html,application/xhtml+xml' } })
+    return { status: res.status, finalUrl: res.url, html: res.status === 200 ? await res.text() : '' }
+  } catch (err) {
+    if (err instanceof RobotsDisallowed) return { status: 'robots', finalUrl: url, html: '' }
+    return { status: 0, finalUrl: url, html: '', error: err.cause?.code || err.name || String(err) }
   }
-  return last
 }
 
 /** Place names a national listing currently links to. */
@@ -247,26 +242,32 @@ async function checkPages() {
 
   for (const t of targets) {
     const prev = state.pages[t.key]
-    let page
+    const page = await fetchPage(t.url)
     let govuk = null
-    try {
-      page = await fetchPage(t.url)
-      if (t.listing?.govukPath) govuk = await govukContent(t.listing.govukPath)
-    } catch (err) {
-      page = { status: 0, finalUrl: t.url, html: '', error: err.cause?.code || err.name || String(err) }
+    if (page.status === 200 && t.listing?.govukPath) {
+      try {
+        govuk = await govukContent(t.listing.govukPath)
+      } catch (err) {
+        notes.push(`${t.label}: GOV.UK content API failed (${err.message}); compared page text only.`)
+      }
     }
 
     if (page.status !== 200) {
-      // 404/410 means the link is dead: someone has to find the new page. Anything
-      // else (403 bot walls, 5xx, timeouts) is usually transient on a CI runner.
-      const dead = page.status === 404 || page.status === 410
-      const why = page.status ? `HTTP ${page.status}` : page.error
-      lines.push(`- ${dead ? '**Dead link**' : 'Could not fetch'}: [${t.label}](${t.url}) - ${why}`)
-      if (dead) review.push(`${t.label}: ${t.url} returns ${why}. Find its new page and update ZONE_INFO.`)
-      // Not a review item: a bot wall that refuses CI would otherwise raise the same
-      // issue every week forever. It stays visible in the report instead.
-      else notes.push(`${t.label} could not be fetched (${why})${prev ? '; kept the previous baseline' : ' and is not being watched yet'}.`)
       if (prev) next.pages[t.key] = prev
+      const dead = page.status === 404 || page.status === 410
+      if (dead) {
+        // The page is gone, not refused: someone has to find where it moved.
+        lines.push(`- **Dead link**: [${t.label}](${t.url}) - HTTP ${page.status}`)
+        review.push(`${t.label}: ${t.url} returns HTTP ${page.status}. Find its new page and update ZONE_INFO.`)
+      } else if (page.status === 'robots') {
+        byHand.push({ ...t, why: 'robots.txt asks automated clients not to fetch it' })
+      } else if (page.status === 0) {
+        lines.push(`- Could not reach [${t.label}](${t.url}) - ${page.error}; will try again next run`)
+      } else {
+        // 401/403/202/429: the site will not serve this check. That is the site's
+        // call; it is listed for a person rather than retried or worked around.
+        byHand.push({ ...t, why: `the site refused this automated request (HTTP ${page.status})` })
+      }
       continue
     }
 
@@ -374,13 +375,25 @@ async function checkVehicles() {
 
 function checkChargesAge() {
   const age = Math.floor((Date.now() - Date.parse(CHARGES_AS_OF)) / 86_400_000)
-  const line = `Charges were last verified by hand on ${CHARGES_AS_OF} (${plural(age, 'day')} ago).`
+  const lines = [`Charges were last verified by hand on ${CHARGES_AS_OF} (${plural(age, 'day')} ago).`]
   if (age > CHARGES_MAX_AGE_DAYS) {
     review.push(
       `Charges have not been re-verified in ${age} days. Check each zone's page in ZONE_INFO, then bump CHARGES_AS_OF.`,
     )
   }
-  sections.push(['Charges', [line]])
+  sections.push(['Charges', lines])
+
+  if (byHand.length) {
+    sections.push([
+      'Not watched automatically',
+      [
+        'These pages cannot be checked by this job, so changes to them will not be reported. ' +
+          'Look at them yourself whenever you re-verify charges:',
+        '',
+        ...byHand.map((t) => `- [${t.label}](${t.url}) - ${t.why}`),
+      ],
+    ])
+  }
 }
 
 // ------------------------------------------------------------------- main --

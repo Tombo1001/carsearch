@@ -11,16 +11,18 @@
  * app is deciding where you can and cannot drive.
  */
 
-import { writeFile, mkdir } from 'node:fs/promises'
+import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import proj4 from 'proj4'
 import { ZONE_SOURCES, PROPOSED_ZONE_SOURCES, CHARGES_AS_OF, ZONE_INFO } from './zone-sources.mjs'
+import { politeFetch, RobotsDisallowed } from './lib/polite-fetch.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 /** `--out <path>` lets the data check build a candidate file without touching the real one. */
 const outArg = process.argv.indexOf('--out')
-const OUT = outArg > -1 ? resolve(process.argv[outArg + 1]) : resolve(ROOT, 'public/data/zones.json')
+const COMMITTED = resolve(ROOT, 'public/data/zones.json')
+const OUT = outArg > -1 ? resolve(process.argv[outArg + 1]) : COMMITTED
 
 /** Simplification tolerance. ~15 m is below consumer GPS noise, so it costs no real accuracy. */
 const SIMPLIFY_METRES = 15
@@ -35,10 +37,7 @@ proj4.defs(
 // ---------------------------------------------------------------- fetching --
 
 async function getJson(url) {
-  const res = await fetch(url, {
-    signal: AbortSignal.timeout(TIMEOUT_MS),
-    headers: { accept: 'application/json' },
-  })
+  const res = await politeFetch(url, { timeoutMs: TIMEOUT_MS, headers: { accept: 'application/json' } })
   if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`)
   const text = await res.text()
   try {
@@ -205,10 +204,29 @@ async function resolveGeometry(src, built) {
 
 async function build() {
   const sources = [...ZONE_SOURCES, ...PROPOSED_ZONE_SOURCES]
+
   const missingInfo = sources.filter((z) => !ZONE_INFO[z.id]).map((z) => z.id)
   if (missingInfo.length) throw new Error(`no ZONE_INFO entry for: ${missingInfo.join(', ')}`)
+
+  /**
+   * The committed boundaries, for sources we are not permitted to re-fetch. If a
+   * host's robots.txt excludes its data service, the zone keeps the official
+   * boundary it already has rather than vanishing from the map - it just stops
+   * being refreshed automatically until someone updates it by hand.
+   */
+  const committed = new Map()
+  let committedAt = null
+  try {
+    const file = JSON.parse(await readFile(COMMITTED, 'utf8'))
+    committedAt = file.generatedAt
+    for (const z of file.zones) committed.set(z.id, z)
+  } catch {
+    // First build: nothing to retain.
+  }
+
   const built = new Map()
   const failures = []
+  const retained = []
 
   for (const src of sources) {
     const label = `${src.id.padEnd(24)}`
@@ -231,6 +249,20 @@ async function build() {
           `${before} -> ${after} points (${src.precision})`,
       )
     } catch (err) {
+      const kept = committed.get(src.id)
+      if (err instanceof RobotsDisallowed && kept?.geometry) {
+        const { geometry: _unused, ...meta } = src
+        built.set(src.id, {
+          ...meta,
+          info: ZONE_INFO[src.id],
+          bbox: kept.bbox,
+          geometry: kept.geometry,
+          boundaryRefresh: { automatic: false, reason: 'robots.txt excludes the data service', keptFrom: kept.boundaryRefresh?.keptFrom ?? committedAt },
+        })
+        retained.push({ id: src.id, name: src.name, url: src.geometry.url, keptFrom: built.get(src.id).boundaryRefresh.keptFrom })
+        console.log(`  kept ${label} previous boundary - ${err.message}`)
+        continue
+      }
       failures.push({ id: src.id, name: src.name, error: String(err.message || err) })
       console.error(`  FAIL ${label} ${err.message || err}`)
     }
@@ -238,6 +270,7 @@ async function build() {
 
   const out = {
     generatedAt: new Date().toISOString(),
+    retained,
     chargesAsOf: CHARGES_AS_OF,
     simplifiedToMetres: SIMPLIFY_METRES,
     zones: [...built.values()],

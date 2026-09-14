@@ -26,6 +26,7 @@ import { mkdir, readFile, writeFile, stat } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { findAttachment, govukContent } from './lib/govuk.mjs'
+import { politeFetch } from './lib/polite-fetch.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const CACHE = resolve(ROOT, 'tmp/dft')
@@ -62,7 +63,7 @@ async function cached({ filename, url, bytes }) {
     // Not cached yet.
   }
   console.log(`  downloading ${filename}${bytes ? ` (${(bytes / 1e6).toFixed(0)} MB)` : ''}`)
-  const res = await fetch(url, { signal: AbortSignal.timeout(600_000) })
+  const res = await politeFetch(url, { timeoutMs: 600_000 })
   if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`)
   const buf = Buffer.from(await res.arrayBuffer())
   if (bytes && buf.length !== bytes) throw new Error(`${filename}: expected ${bytes} bytes, got ${buf.length}`)

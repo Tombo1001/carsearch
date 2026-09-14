@@ -101,7 +101,20 @@ jobs:
           existing_pr=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
           if [ -n "$existing_pr" ]; then
             gh pr edit "$existing_pr" --title "$title" --body-file tmp/body.md
-          elif ! gh pr create --base main --head "$BRANCH" --title "$title" --body-file tmp/body.md; then
+            pr="$existing_pr"
+          elif gh pr create --base main --head "$BRANCH" --title "$title" --body-file tmp/body.md; then
+            pr=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')
+          else
+            pr=""
+          fi
+
+          # The pull request carries the same report, so an issue from an earlier
+          # run is now a duplicate. Close it rather than leave two places to look.
+          if [ -n "$pr" ]; then
+            if [ -n "$existing_issue" ]; then
+              gh issue close "$existing_issue" --comment "Superseded by #$pr, which has the latest report."
+            fi
+          else
             # Most likely the repo does not allow Actions to open pull requests.
             printf '\n\n**Could not open a pull request automatically.** Review and merge the changes here: %s/compare/main...%s\n' \
               "$REPO_URL" "$BRANCH" >> tmp/body.md

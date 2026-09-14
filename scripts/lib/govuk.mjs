@@ -9,11 +9,13 @@
  * signal than hashing the HTML.
  */
 
+import { politeFetch } from './polite-fetch.mjs'
+
 const TIMEOUT_MS = 60_000
 
 export async function govukContent(path) {
   const url = `https://www.gov.uk/api/content/${path.replace(/^\/+/, '')}`
-  const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS), headers: { accept: 'application/json' } })
+  const res = await politeFetch(url, { timeoutMs: TIMEOUT_MS, headers: { accept: 'application/json' } })
   if (!res.ok) throw new Error(`gov.uk content API ${res.status} for ${path}`)
   return res.json()
 }

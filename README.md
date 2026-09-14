@@ -67,8 +67,9 @@ one is published, and are simplified to a tolerance finer than consumer GPS nois
 few zones publish no open boundary and are drawn as approximate discs, dashed on the
 map and labelled as such.
 
-A weekly check re-fetches every boundary, watches each authority's own page for
-changes to charges, and watches GOV.UK and mygov.scot for new zones. Charges are
+A weekly check re-fetches every boundary it is permitted to, watches each
+authority's own page for changes to charges, and watches GOV.UK and mygov.scot for
+new zones. It obeys robots.txt and does not retry a site that refuses it. Charges are
 never updated by machine - a person reads what changed. See
 [docs/data.md](docs/data.md).
 
