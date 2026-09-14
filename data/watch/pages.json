@@ -394,7 +394,7 @@
   },
   "birmingham-caz": {
    "url": "https://www.brumbreathes.co.uk/info/32/charges-operation",
-   "checkedAt": "2026-09-13",
+   "checkedAt": "2026-09-14",
    "lines": [
     "Pay a Clean Air Zone charge",
     "You can pay a Clean Air Zone charge by calling the National Contact Centre on 0300 029 8888:",
@@ -405,7 +405,7 @@
   },
   "bristol-caz": {
    "url": "https://www.bristol.gov.uk/residents/streets-travel/bristols-caz",
-   "checkedAt": "2026-09-13",
+   "checkedAt": "2026-09-14",
    "lines": [
     "For residents",
     "Streets and travel",
@@ -430,7 +430,7 @@
   },
   "bradford-caz": {
    "url": "https://www.bradford.gov.uk/clean-air-zone/clean-air-zone/",
-   "checkedAt": "2026-09-13",
+   "checkedAt": "2026-09-14",
    "lines": [
     "Clean Air Zone",
     "Pay your daily charge",
@@ -469,7 +469,7 @@
   },
   "sheffield-caz": {
    "url": "https://www.sheffield.gov.uk/clean-air-zone-sheffield",
-   "checkedAt": "2026-09-13",
+   "checkedAt": "2026-09-14",
    "lines": [
     "Sheffield Clean Air Zone",
     "View Sheffield’s Clean Air Zone and learn about vehicle charges.",
@@ -486,7 +486,7 @@
   },
   "bath-caz": {
    "url": "https://www.bathnes.gov.uk/baths-clean-air-zone",
-   "checkedAt": "2026-09-13",
+   "checkedAt": "2026-09-14",
    "lines": [
     "Find out more about",
     "You are here",
@@ -561,7 +561,7 @@
   },
   "tyneside-caz": {
    "url": "https://www.breathe-cleanair.com/",
-   "checkedAt": "2026-09-13",
+   "checkedAt": "2026-09-14",
    "lines": [
     "Newcastle and Gateshead Clean Air Zone",
     "A Clean Air Zone is now in place in part of Newcastle and Gateshead.",
@@ -570,8 +570,6 @@
     "Check your vehicle",
     "If you need to pay a CAZ charge you must do so within six days of your journey. Find out how to pay using the official payment channels.",
     "Check how to pay a CAZ charge",
-    "You can also find out about financial support if you want to upgrade your vehicle to a cleaner model.",
-    "Check whether you are eligible for a grant",
     "Some vehicles are automatically exempt from charges and some may be eligible to apply for an exemption.",
     "Check whether your vehicle is exempt",
     "The Clean Air Zone covers most of Newcastle city centre, as well as routes over the Tyne, Swing, High Level and Redheugh Bridges. Road signage is in place on approaching routes and on the boundary of the zone.",
@@ -592,7 +590,7 @@
   },
   "greater-manchester-caz": {
    "url": "https://cleanairgm.com/",
-   "checkedAt": "2026-09-13",
+   "checkedAt": "2026-09-14",
    "lines": [
     "Stay in the loop",
     "Sign up to get all the latest Clean Air news. Sign up now",
@@ -621,7 +619,7 @@
   },
   "edinburgh-lez": {
    "url": "https://www.edinburgh.gov.uk/lez",
-   "checkedAt": "2026-09-13",
+   "checkedAt": "2026-09-14",
    "lines": [
     "Low emission zone",
     "We started issuing fines (penalty charge notices) from 1 June 2024. If your vehicle does not meet the emission standards, you may be fined if you drive through the low emission zone (LEZ).",
@@ -654,7 +652,7 @@
   },
   "dundee-lez": {
    "url": "https://www.dundeecity.gov.uk/service-area/city-development/sustainable-transport-and-roads/dundee-low-emission-zone-scheme-lez",
-   "checkedAt": "2026-09-13",
+   "checkedAt": "2026-09-14",
    "lines": [
     "Dundee Low Emission Zone Scheme (LEZ)",
     "Was This Useful?",
@@ -668,14 +666,14 @@
   },
   "aberdeen-lez": {
    "url": "https://www.aberdeencity.gov.uk/Council-Services/roads-parking-and-travel/low-emission-zone-lez",
-   "checkedAt": "2026-09-13",
+   "checkedAt": "2026-09-14",
    "lines": [
     "Aberdeen City Council"
    ]
   },
   "england-caz": {
    "url": "https://www.gov.uk/guidance/driving-in-a-clean-air-zone",
-   "checkedAt": "2026-09-13",
+   "checkedAt": "2026-09-14",
    "publicUpdatedAt": "2026-02-12T11:59:29+00:00",
    "lines": [
     "Guidance",
@@ -893,7 +891,7 @@
   },
   "scotland-lez": {
    "url": "https://www.mygov.scot/low-emission-zones",
-   "checkedAt": "2026-09-13",
+   "checkedAt": "2026-09-14",
    "lines": [
     "A Low Emission Zone (LEZ) covers specific roads. It stops the most polluting vehicles from being driven in the zone to improve air quality and protect health.",
     "Check your vehicle",
