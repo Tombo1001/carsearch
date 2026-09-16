@@ -73,6 +73,14 @@ new zones. It obeys robots.txt and does not retry a site that refuses it. Charge
 never updated by machine - a person reads what changed. See
 [docs/data.md](docs/data.md).
 
+## Fuel prices
+
+A tick box on the map shows today's median pump price for unleaded or diesel in
+each UK region, with its change over the past week. The prices come from
+[Fuel Finder](https://www.developer.fuel-finder.service.gov.uk/fuel-finder), the
+GOV.UK service every UK forecourt must report to, and update daily. The labels
+move out of the way of the zones rather than cover them.
+
 ## The car catalogue
 
 The Catalogue tab lists **every car model with at least 50 still licensed in the
@@ -130,5 +138,7 @@ licensed under the
 [Open Government Licence v3.0](https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/).
 The zone boundaries are derived from public sector data published under the
 [Open Government Licence v3](https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/)
-(v2 for some London Datastore sets) and remain subject to it. Map data is
+(v2 for some London Datastore sets) and remain subject to it. Region boundaries are from the ONS Open Geography Portal and contain OS data
+© Crown copyright and database right, under the Open Government Licence v3.0.
+Fuel prices are from Fuel Finder (GOV.UK). Map data is
 © OpenStreetMap contributors, [ODbL](https://www.openstreetmap.org/copyright).

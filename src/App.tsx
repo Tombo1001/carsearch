@@ -5,6 +5,8 @@ import VehiclePanel from './components/VehiclePanel'
 import ResultsPanel from './components/ResultsPanel'
 import Catalogue from './components/Catalogue'
 import SiteLinks from './components/SiteLinks'
+import FuelControl from './components/FuelControl'
+import { pumpFor, type FuelData, type MapFuel } from './lib/fuel'
 import {
   DEFAULT_OPTIONS,
   computeZoneVisits,
@@ -39,6 +41,13 @@ export default function App() {
   const [progress, setProgress] = useState<Progress | null>(null)
   const [focusZoneId, setFocusZoneId] = useState<string | null>(null)
 
+  const [fuelData, setFuelData] = useState<FuelData | null>(null)
+  const [fuelOn, setFuelOn] = useState(false)
+  /** The user's own pick; until they make one, the pump follows the car. */
+  const [fuelPick, setFuelPick] = useState<MapFuel | null>(null)
+  const [fuelZoomedIn, setFuelZoomedIn] = useState(false)
+  const mapFuel = fuelPick ?? pumpFor(vehicle.fuel)
+
   /** Guards against an older, slower run overwriting a newer one. */
   const runToken = useRef(0)
 
@@ -47,6 +56,15 @@ export default function App() {
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .then(setZoneData)
       .catch((e: Error) => setZoneError(e.message))
+  }, [])
+
+  // Fuel prices are optional: until the daily job has run there is no file, and
+  // the control simply does not appear.
+  useEffect(() => {
+    fetch(`${import.meta.env.BASE_URL}data/fuel.json`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: FuelData | null) => setFuelData(d?.version === 1 && d.regions?.length ? d : null))
+      .catch(() => setFuelData(null))
   }, [])
 
   // The expensive geometric pass: only when the history or the options change.
@@ -167,7 +185,24 @@ export default function App() {
           </aside>
 
           <div className="map-pane">
-            <MapView zones={zones} impacts={result?.impacts ?? []} timeline={timeline} focusZoneId={focusZoneId} />
+            <MapView
+              zones={zones}
+              impacts={result?.impacts ?? []}
+              timeline={timeline}
+              focusZoneId={focusZoneId}
+              fuel={{ enabled: fuelOn, fuel: mapFuel, data: fuelData }}
+              onFuelZoomedIn={setFuelZoomedIn}
+            />
+            {fuelData && (
+              <FuelControl
+                data={fuelData}
+                enabled={fuelOn}
+                onEnabled={setFuelOn}
+                fuel={mapFuel}
+                onFuel={setFuelPick}
+                zoomedIn={fuelZoomedIn}
+              />
+            )}
             {!timeline && (
               <div className="map-overlay small secondary">
                 Every low-emission, clean-air and congestion zone in the UK is shown. Load your Timeline

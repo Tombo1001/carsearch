@@ -76,9 +76,20 @@ Locally, the same variables work from the shell or a `.env` file:
 VITE_TILE_URL='https://…/{z}/{x}/{y}.png?key=…' npm run build
 ```
 
+## Secrets
+
+The site itself needs none. Two workflows use repository secrets:
+
+| Secret | Used by | For |
+|---|---|---|
+| `FUEL_FINDER_CLIENT_ID` | `fuel-prices.yml` | Daily fuel prices. See [data.md](data.md#getting-credentials). |
+| `FUEL_FINDER_CLIENT_SECRET` | `fuel-prices.yml` | Same. |
+
+Neither reaches the browser. The job publishes only regional medians.
+
 ## What the deployment does not need
 
-No database, no server runtime, no environment secrets, no analytics endpoint. The
+No database, no server runtime, no secrets in the site, no analytics endpoint. The
 zone and catalogue JSON are committed, so CI reaches no network beyond npm. If a
 future change adds a backend, the privacy claim on the front page stops being true
 and needs rewriting.

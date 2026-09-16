@@ -11,7 +11,9 @@
     "typecheck": "tsc -b --pretty",
     "data:zones": "node scripts/build-zones.mjs",
     "data:catalogue": "node scripts/build-catalogue.mjs",
-    "data:check": "node scripts/check-data.mjs"
+    "data:check": "node scripts/check-data.mjs",
+    "data:regions": "node scripts/build-regions.mjs",
+    "data:fuel": "node scripts/build-fuel.mjs"
   },
   "dependencies": {
     "maplibre-gl": "^5.6.0",

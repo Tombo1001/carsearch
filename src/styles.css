@@ -639,3 +639,117 @@ tbody tr:hover {
     padding: 5px 10px;
   }
 }
+
+/* ------------------------------------------------------------ fuel prices -- */
+
+.fuel-control {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
+  max-width: 260px;
+  padding: 8px 10px;
+  background: color-mix(in srgb, var(--surface-1) 94%, transparent);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  align-self: flex-start;
+}
+.segmented button {
+  font: inherit;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  padding: 3px 10px;
+  cursor: pointer;
+}
+.segmented button[aria-checked='true'] {
+  background: var(--raised);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.fuel-table {
+  margin-top: 4px;
+  border-collapse: collapse;
+  width: 100%;
+}
+.fuel-table td {
+  padding: 1px 4px 1px 0;
+}
+
+/* The label layer sits over the canvas but never takes a click: the map below
+   stays fully draggable and every zone stays clickable. */
+.fuel-labels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.fuel-labels.zoomed-in {
+  display: none;
+}
+
+.fuel-leaders {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+/* Contrast with the basemap, not the page: the lines sit on grey map tiles. */
+.fuel-leaders line {
+  stroke: var(--text-primary);
+  stroke-opacity: 0.75;
+  stroke-width: 1.5;
+}
+.fuel-leaders circle {
+  fill: var(--text-primary);
+  stroke: var(--surface-1);
+  stroke-width: 1.5;
+}
+
+/* Neutral on purpose. Red and green would read as the zone statuses. */
+.fuel-chip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 3px 7px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface-1) 90%, transparent);
+  color: var(--text-primary);
+  font-size: 11px;
+  line-height: 1.25;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+  visibility: hidden;
+}
+.fuel-chip strong {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.fuel-chip-name,
+.fuel-chip-delta {
+  color: var(--text-secondary);
+}
+.fuel-chip-delta:empty,
+.fuel-labels.compact .fuel-chip-delta {
+  display: none;
+}
+.fuel-labels.compact .fuel-chip {
+  flex-direction: row;
+  gap: 5px;
+  align-items: baseline;
+  padding: 2px 6px;
+}

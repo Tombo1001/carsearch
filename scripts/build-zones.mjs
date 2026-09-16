@@ -17,6 +17,7 @@ import { dirname, resolve } from 'node:path'
 import proj4 from 'proj4'
 import { ZONE_SOURCES, PROPOSED_ZONE_SOURCES, CHARGES_AS_OF, ZONE_INFO } from './zone-sources.mjs'
 import { politeFetch, RobotsDisallowed } from './lib/polite-fetch.mjs'
+import { bboxOf, countPositions, simplifyMultiPolygon, toMultiPolygon } from './lib/geometry.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 /** `--out <path>` lets the data check build a candidate file without touching the real one. */
@@ -94,92 +95,6 @@ function mapCoords(geometry, fn) {
   if (depth === undefined) throw new Error(`unsupported geometry type ${geometry.type}`)
   return { ...geometry, coordinates: walk(geometry.coordinates, depth) }
 }
-
-/** Collapses a FeatureCollection of (Multi)Polygons into one MultiPolygon coordinate array. */
-function toMultiPolygon(fc) {
-  const polys = []
-  for (const f of fc.features) {
-    const g = f.geometry
-    if (!g) continue
-    if (g.type === 'Polygon') polys.push(g.coordinates)
-    else if (g.type === 'MultiPolygon') polys.push(...g.coordinates)
-    // Anything else (points, lines) is not a zone area and is dropped.
-  }
-  if (!polys.length) throw new Error('no polygon geometry in source')
-  return polys
-}
-
-/** Douglas-Peucker on a ring, with tolerance given in degrees. */
-function simplifyRing(ring, tol) {
-  if (ring.length <= 4) return ring
-  const sqTol = tol * tol
-  const keep = new Uint8Array(ring.length)
-  keep[0] = keep[ring.length - 1] = 1
-  const stack = [[0, ring.length - 1]]
-
-  while (stack.length) {
-    const [first, last] = stack.pop()
-    let maxSq = 0
-    let index = -1
-    for (let i = first + 1; i < last; i++) {
-      const sq = sqSegDist(ring[i], ring[first], ring[last])
-      if (sq > maxSq) {
-        maxSq = sq
-        index = i
-      }
-    }
-    if (maxSq > sqTol && index > 0) {
-      keep[index] = 1
-      stack.push([first, index], [index, last])
-    }
-  }
-
-  const out = ring.filter((_, i) => keep[i])
-  // A ring needs at least 4 positions (first === last). If we over-simplified, keep the original.
-  return out.length >= 4 ? out : ring
-}
-
-function sqSegDist(p, a, b) {
-  let [x, y] = a
-  let dx = b[0] - x
-  let dy = b[1] - y
-  if (dx !== 0 || dy !== 0) {
-    const t = ((p[0] - x) * dx + (p[1] - y) * dy) / (dx * dx + dy * dy)
-    if (t > 1) [x, y] = b
-    else if (t > 0) {
-      x += dx * t
-      y += dy * t
-    }
-  }
-  dx = p[0] - x
-  dy = p[1] - y
-  return dx * dx + dy * dy
-}
-
-function simplifyMultiPolygon(polys, metres) {
-  // At UK latitudes a degree of longitude is ~65 km and of latitude ~111 km. Using the
-  // smaller figure keeps the tolerance conservative in both axes.
-  const tol = metres / 111_320
-  return polys.map((rings) => rings.map((ring) => simplifyRing(ring, tol)))
-}
-
-function bboxOf(polys) {
-  let minX = Infinity
-  let minY = Infinity
-  let maxX = -Infinity
-  let maxY = -Infinity
-  for (const rings of polys)
-    for (const ring of rings)
-      for (const [x, y] of ring) {
-        if (x < minX) minX = x
-        if (x > maxX) maxX = x
-        if (y < minY) minY = y
-        if (y > maxY) maxY = y
-      }
-  return [minX, minY, maxX, maxY]
-}
-
-const countPositions = (polys) => polys.reduce((n, rings) => n + rings.reduce((m, r) => m + r.length, 0), 0)
 
 // ------------------------------------------------------------------- main --
 

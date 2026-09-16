@@ -1,0 +1,100 @@
+# Daily regional fuel prices from Fuel Finder (GOV.UK).
+#
+# Fetches every forecourt's current price, writes regional medians to
+# public/data/fuel.json, commits that one file to main, and redeploys the site.
+# Only the aggregate file is committed; individual forecourt data never is.
+#
+# Needs two repository secrets, from a Fuel Finder "information recipient"
+# application (see docs/data.md):
+#   FUEL_FINDER_CLIENT_ID
+#   FUEL_FINDER_CLIENT_SECRET
+# Without them the job does nothing and succeeds.
+name: Fuel prices
+
+on:
+  schedule:
+    # 07:17 UTC daily: after the morning price changes, off the busy on-the-hour slot.
+    - cron: '17 7 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  # To start the Pages deploy: a push made with GITHUB_TOKEN does not trigger
+  # other workflows by itself.
+  actions: write
+  issues: write
+
+concurrency:
+  group: fuel-prices
+  cancel-in-progress: false
+
+env:
+  ISSUE_TITLE: Fuel price update failing
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Fetch prices
+        env:
+          FUEL_FINDER_CLIENT_ID: ${{ secrets.FUEL_FINDER_CLIENT_ID }}
+          FUEL_FINDER_CLIENT_SECRET: ${{ secrets.FUEL_FINDER_CLIENT_SECRET }}
+        run: node scripts/build-fuel.mjs
+
+      - name: Commit and deploy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- public/data/fuel.json && [ -z "$(git ls-files --others --exclude-standard public/data/fuel.json)" ]; then
+            echo "No change to fuel.json."
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/data/fuel.json
+          git commit -m "Fuel prices $(date -u +%F)"
+          # Someone may have pushed since checkout; this file is only ever written here.
+          for attempt in 1 2 3; do
+            if git push origin HEAD:main; then break; fi
+            git pull --rebase origin main
+          done
+          gh workflow run pages.yml --ref main
+
+      - name: Report failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          body="The daily fuel price update failed on $(date -u +%F): $RUN_URL
+
+          The site keeps showing the last good prices, with their date. The map control warns visitors once they are more than three days old.
+
+          This issue closes itself on the next successful run."
+          existing=$(gh issue list --state open --search "\"$ISSUE_TITLE\" in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "Failed again on $(date -u +%F): $RUN_URL"
+          else
+            gh issue create --title "$ISSUE_TITLE" --body "$body"
+          fi
+
+      - name: Close failure issue
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          existing=$(gh issue list --state open --search "\"$ISSUE_TITLE\" in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue close "$existing" --comment "Fuel prices updated successfully on $(date -u +%F)."
+          fi

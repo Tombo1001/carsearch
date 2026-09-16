@@ -4,6 +4,8 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import type { ParsedTimeline, Zone, ZoneImpact } from '../lib/types'
 import { simplifyPath } from '../lib/geo'
 import { TILE_ATTRIBUTION, TILE_URL } from '../lib/config'
+import type { FuelData, MapFuel, Rect, RegionShapes } from '../lib/fuel'
+import { FUEL_MAX_ZOOM, FuelOverlay } from '../lib/fuelOverlay'
 
 /**
  * Zone status hues. Validated as a set by the data-viz palette validator (all
@@ -63,9 +65,15 @@ interface Props {
   timeline: ParsedTimeline | null
   /** Zone id to fly to, bumped by the results list. */
   focusZoneId?: string | null
+  /** Regional fuel price overlay. Off unless the user ticks it. */
+  fuel?: { enabled: boolean; fuel: MapFuel; data: FuelData | null }
+  onFuelZoomedIn?: (zoomedIn: boolean) => void
 }
 
-export default function MapView({ zones, impacts, timeline, focusZoneId }: Props) {
+/** Map chrome that fuel labels must not sit under, as selectors under the map pane. */
+const CHROME = ['.maplibregl-ctrl-top-right', '.maplibregl-ctrl-bottom-right', '.maplibregl-ctrl-bottom-left', '.map-overlay', '.fuel-control']
+
+export default function MapView({ zones, impacts, timeline, focusZoneId, fuel, onFuelZoomedIn }: Props) {
   const container = useRef<HTMLDivElement>(null)
   const map = useRef<maplibregl.Map | null>(null)
   const ready = useRef(false)
@@ -80,8 +88,10 @@ export default function MapView({ zones, impacts, timeline, focusZoneId }: Props
    * empty. Reading props directly there meant every click looked up a zone in an
    * empty list and no popup ever opened. Handlers read these refs instead.
    */
-  const latest = useRef({ zones, impactById })
-  latest.current = { zones, impactById }
+  const latest = useRef({ zones, impactById, onFuelZoomedIn })
+  latest.current = { zones, impactById, onFuelZoomedIn }
+  const fuelOverlay = useRef<FuelOverlay | null>(null)
+  const regionShapes = useRef<Promise<RegionShapes> | null>(null)
 
   const zoneFeatures = useMemo(
     () => ({
@@ -218,10 +228,13 @@ export default function MapView({ zones, impacts, timeline, focusZoneId }: Props
           .addTo(m)
       }
     })
+    m.on('zoomend', () => latest.current.onFuelZoomedIn?.(m.getZoom() > FUEL_MAX_ZOOM))
     m.on('mouseenter', 'zone-fill', () => (m.getCanvas().style.cursor = 'pointer'))
     m.on('mouseleave', 'zone-fill', () => (m.getCanvas().style.cursor = ''))
 
     return () => {
+      fuelOverlay.current?.destroy()
+      fuelOverlay.current = null
       m.remove()
       map.current = null
       ready.current = false
@@ -255,6 +268,44 @@ export default function MapView({ zones, impacts, timeline, focusZoneId }: Props
     else m.once('carsearch:ready', apply)
   }, [routeFeatures])
 
+  // ----------------------------------------------------------- fuel prices --
+
+  const fuelEnabled = fuel?.enabled ?? false
+  const fuelData = fuel?.data ?? null
+  const fuelType = fuel?.fuel ?? 'E10'
+
+  useEffect(() => {
+    const m = map.current
+    if (!m) return
+    if (!fuelEnabled) {
+      fuelOverlay.current?.setVisible(false)
+      return
+    }
+    if (!fuelData) return
+
+    let cancelled = false
+    const start = async () => {
+      // Boundaries are only needed once someone turns the overlay on.
+      regionShapes.current ??= fetch(`${import.meta.env.BASE_URL}data/regions.json`).then((r) =>
+        r.ok ? r.json() : Promise.reject(new Error(`regions.json: HTTP ${r.status}`)),
+      )
+      const shapes = await regionShapes.current
+      if (cancelled) return
+      if (!fuelOverlay.current) {
+        fuelOverlay.current = new FuelOverlay(m, () => fuelObstacles(m, latest.current.zones))
+      }
+      fuelOverlay.current.setFuel(fuelType)
+      fuelOverlay.current.setData(fuelData, shapes)
+      fuelOverlay.current.setVisible(true)
+    }
+    const run = () => void start().catch((e) => console.error('Fuel overlay:', e))
+    if (ready.current) run()
+    else m.once('carsearch:ready', run)
+    return () => {
+      cancelled = true
+    }
+  }, [fuelEnabled, fuelData, fuelType])
+
   useEffect(() => {
     const m = map.current
     if (!m || !focusZoneId) return
@@ -264,6 +315,31 @@ export default function MapView({ zones, impacts, timeline, focusZoneId }: Props
   }, [focusZoneId, zones])
 
   return <div className="map-root" ref={container} />
+}
+
+/**
+ * Everything a fuel label must stay clear of, in map-container pixels: every zone's
+ * on-screen bounding box, plus the map's own controls and panels.
+ */
+function fuelObstacles(m: maplibregl.Map, zones: Zone[]): Rect[] {
+  const out: Rect[] = []
+  for (const z of zones) {
+    const a = m.project([z.bbox[0], z.bbox[3]])
+    const b = m.project([z.bbox[2], z.bbox[1]])
+    // A zone smaller than a few pixels still gets room for its outline.
+    const pad = 3
+    out.push({ x: Math.min(a.x, b.x) - pad, y: Math.min(a.y, b.y) - pad, w: Math.abs(b.x - a.x) + 2 * pad, h: Math.abs(b.y - a.y) + 2 * pad })
+  }
+  const container = m.getContainer()
+  const origin = container.getBoundingClientRect()
+  const pane = container.parentElement ?? container
+  for (const sel of CHROME) {
+    for (const el of pane.querySelectorAll<HTMLElement>(sel)) {
+      const r = el.getBoundingClientRect()
+      if (r.width && r.height) out.push({ x: r.left - origin.left, y: r.top - origin.top, w: r.width, h: r.height })
+    }
+  }
+  return out
 }
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)

@@ -7,6 +7,8 @@ needs no backend and CI needs no network beyond npm.
 |---|---|---|
 | `zones.json` | Every UK clean-air, low-emission and congestion zone: boundary, charges, hours, rules | `npm run data:zones` |
 | `catalogue.json` | Car models on UK roads, for the Catalogue tab | `npm run data:catalogue` |
+| `fuel.json` | Median pump prices per UK region, for the map overlay | `npm run data:fuel`, daily in CI |
+| `regions.json` | Outlines of the 12 UK statistical regions | `npm run data:regions`, by hand |
 
 `npm run data:check` reports whether either is out of date. It runs weekly in CI.
 
@@ -107,6 +109,98 @@ already in `catalogue.json`.
 
 DfT publishes these files roughly annually. Note that the source files are
 Windows-1252, not UTF-8.
+
+## Fuel prices
+
+The map's **Fuel prices** tick box shows the median pump price in each of the
+UK's 12 statistical regions, for unleaded (E10) or diesel (B7). It follows the car
+selected in the sidebar until you pick a fuel yourself.
+
+### Where the prices come from
+
+[Fuel Finder](https://www.developer.fuel-finder.service.gov.uk/fuel-finder) is the
+GOV.UK service set up by the Motor Fuel Price (Open Data) Regulations 2025. Every
+UK forecourt has to publish a price change within 30 minutes. `scripts/build-fuel.mjs`
+reads its public API once a day:
+
+- `POST /api/v1/oauth/generate_access_token` for a one-hour token.
+- `GET /api/v1/pfs` for forecourt locations, 500 per page.
+- `GET /api/v1/pfs/fuel-prices` for their prices, 500 per page.
+
+That is about 40 requests a day, one at a time with a second between them. The API
+allows 100 a minute.
+
+Each open forecourt is placed in a region by its coordinates, using the ONS ITL1
+boundaries (January 2025), or by country for Scotland, Wales and Northern Ireland
+when coordinates are missing. The script then takes the median per region and fuel.
+It excludes:
+
+- closed forecourts;
+- prices outside 80 to 300p a litre, which are typing errors, not prices;
+- any region and fuel with fewer than 10 forecourts reporting, which shows as `n/a`.
+
+It publishes a median, not a mean, so a handful of motorway services cannot drag
+a region's figure up.
+
+`fuel.json` keeps 60 days of daily medians. The map uses them for each region's
+change over the past week.
+
+**Only the aggregates are ever written or committed.** Forecourt names, addresses
+and phone numbers stay inside the script. `--dump` saves the raw responses to
+`tmp/` for debugging; `tmp/` is gitignored, and a dump must never be committed.
+
+### Getting credentials
+
+The API needs OAuth client credentials, tied to a GOV.UK One Login:
+
+1. Go to the [Fuel Finder developer portal](https://www.developer.fuel-finder.service.gov.uk/fuel-finder/public-api)
+   and choose **Access public API**.
+2. Sign in with GOV.UK One Login and create an information recipient application.
+3. Copy the **client ID** and **client secret**.
+4. In the repo, **Settings → Secrets and variables → Actions → Secrets**, add
+   `FUEL_FINDER_CLIENT_ID` and `FUEL_FINDER_CLIENT_SECRET`.
+
+These are real secrets, unlike `VITE_TILE_URL`. They are only used by the CI job,
+never shipped to the browser.
+
+To run it locally:
+
+```bash
+FUEL_FINDER_CLIENT_ID=... FUEL_FINDER_CLIENT_SECRET=... npm run data:fuel
+```
+
+Without credentials the script says so and exits cleanly, and the site simply has
+no fuel control.
+
+### The daily job
+
+`.github/workflows/fuel-prices.yml` runs at 07:17 UTC. It commits
+`public/data/fuel.json` straight to `main` when the prices changed, then starts the
+Pages deploy. It has to start the deploy itself, because a push made with the
+workflow's own token does not trigger other workflows.
+
+If a run fails, the site keeps the last good prices. The job opens a
+*Fuel price update failing* issue and closes it again on the next successful run.
+The map control also tells visitors when its prices are three or more days old.
+
+A response with fewer than 1,000 forecourts is treated as an outage, and the job
+refuses to publish it.
+
+### How the overlay stays off the zones
+
+- **Region outlines** are drawn beneath the zone layers and have no fill. A tint
+  under a zone would change its colour, and the colours mean something.
+- **Price labels** are placed on every map move. Each one starts at its region's
+  ONS label point. If it would touch a zone's box, a map control, another label or
+  the edge of the view, it moves outwards in steps. A label that moved gets a
+  leader line back to its region. The line stops at the edge of any zone in the
+  way, and the anchor dot is dropped if a zone covers it, which is always the case
+  for London.
+- A label with nowhere to go is not drawn. The region list in the control still
+  has every price.
+- Past city zoom the labels hide, because a regional average means nothing there.
+- The label layer never takes a click, so every zone stays clickable, and zone
+  popups draw above the labels.
 
 ## The weekly check
 
