@@ -8,7 +8,7 @@
 # `npm run data:zones` on the host and rebuild the image.
 
 # ---------------------------------------------------------------- builder --
-FROM node:22-alpine AS builder
+FROM node:25-alpine AS builder
 WORKDIR /app
 
 # Copy manifests first so the dependency layer caches across source edits.
