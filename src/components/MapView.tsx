@@ -1,11 +1,17 @@
 import { useEffect, useMemo, useRef } from 'react'
-import maplibregl, { type LngLatBoundsLike, type StyleSpecification } from 'maplibre-gl'
+import * as maplibregl from 'maplibre-gl'
+import type { LngLatBoundsLike, StyleSpecification } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import type { ParsedTimeline, Zone, ZoneImpact } from '../lib/types'
 import { simplifyPath } from '../lib/geo'
 import { TILE_ATTRIBUTION, TILE_URL } from '../lib/config'
 import type { FuelData, MapFuel, Rect, RegionShapes } from '../lib/fuel'
 import { FUEL_MAX_ZOOM, FuelOverlay } from '../lib/fuelOverlay'
+
+// MapLibre finds its worker relative to its own module URL, which a bundler moves.
+// Point it at the worker file Vite emits instead, or the map stays blank.
+maplibregl.setWorkerUrl(maplibreWorkerUrl)
 
 /**
  * Zone status hues. Validated as a set by the data-viz palette validator (all
@@ -77,6 +83,9 @@ export default function MapView({ zones, impacts, timeline, focusZoneId, fuel, o
   const container = useRef<HTMLDivElement>(null)
   const map = useRef<maplibregl.Map | null>(null)
   const ready = useRef(false)
+  /** Work queued by the effects below until the map's sources and layers exist. */
+  const pending = useRef<(() => void)[]>([])
+  const whenReady = (fn: () => void) => (ready.current ? fn() : pending.current.push(fn))
 
   const impactById = useMemo(() => new Map(impacts.map((i) => [i.zone.id, i])), [impacts])
 
@@ -207,7 +216,7 @@ export default function MapView({ zones, impacts, timeline, focusZoneId, fuel, o
       })
 
       ready.current = true
-      m.fire('carsearch:ready')
+      for (const fn of pending.current.splice(0)) fn()
     })
 
     m.on('click', 'zone-fill', (e) => {
@@ -238,6 +247,7 @@ export default function MapView({ zones, impacts, timeline, focusZoneId, fuel, o
       m.remove()
       map.current = null
       ready.current = false
+      pending.current = []
     }
     // Intentionally mounts once: later data changes are pushed via setData below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -249,8 +259,7 @@ export default function MapView({ zones, impacts, timeline, focusZoneId, fuel, o
     const m = map.current
     if (!m) return
     const apply = () => (m.getSource('zones') as maplibregl.GeoJSONSource | undefined)?.setData(zoneFeatures)
-    if (ready.current) apply()
-    else m.once('carsearch:ready', apply)
+    whenReady(apply)
   }, [zoneFeatures])
 
   useEffect(() => {
@@ -264,8 +273,7 @@ export default function MapView({ zones, impacts, timeline, focusZoneId, fuel, o
       for (const line of first.geometry.coordinates) for (const c of line) bounds.extend(c as [number, number])
       if (!bounds.isEmpty()) m.fitBounds(bounds, { padding: 40, maxZoom: 11, duration: 600 })
     }
-    if (ready.current) apply()
-    else m.once('carsearch:ready', apply)
+    whenReady(apply)
   }, [routeFeatures])
 
   // ----------------------------------------------------------- fuel prices --
@@ -299,8 +307,7 @@ export default function MapView({ zones, impacts, timeline, focusZoneId, fuel, o
       fuelOverlay.current.setVisible(true)
     }
     const run = () => void start().catch((e) => console.error('Fuel overlay:', e))
-    if (ready.current) run()
-    else m.once('carsearch:ready', run)
+    whenReady(run)
     return () => {
       cancelled = true
     }
