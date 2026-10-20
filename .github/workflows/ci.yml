@@ -1,0 +1,57 @@
+# Typecheck and build every pull request, then merge Dependabot's routine ones.
+#
+# The merge step only takes npm updates below a major version, and only once the
+# build above has passed. Everything else (majors, Actions, Docker, anything not
+# from Dependabot) is left open for a person. See .github/dependabot.yml.
+name: CI
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npx tsc -b --noEmit
+
+      - name: Build
+        run: npm run build
+
+  automerge:
+    needs: build
+    if: github.event.pull_request.user.login == 'dependabot[bot]' && github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      # To start the Pages deploy: a merge made with GITHUB_TOKEN does not
+      # trigger other workflows by itself.
+      actions: write
+    steps:
+      - id: meta
+        uses: dependabot/fetch-metadata@v3
+        with:
+          github-token: ${{ github.token }}
+
+      - name: Merge and deploy
+        if: steps.meta.outputs.package-ecosystem == 'npm_and_yarn' && steps.meta.outputs.update-type != 'version-update:semver-major'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.html_url }}
+        run: |
+          set -euo pipefail
+          gh pr merge "$PR" --squash --delete-branch
+          gh workflow run pages.yml --repo "$GITHUB_REPOSITORY" --ref main
