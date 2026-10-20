@@ -2,7 +2,7 @@
 
 [![Deploy](https://github.com/Tombo1001/carsearch/actions/workflows/pages.yml/badge.svg?branch=main)](https://github.com/Tombo1001/carsearch/actions/workflows/pages.yml)
 [![Data check](https://github.com/Tombo1001/carsearch/actions/workflows/data-check.yml/badge.svg?branch=main)](https://github.com/Tombo1001/carsearch/actions/workflows/data-check.yml)
-[![Dependabot](https://github.com/Tombo1001/carsearch/actions/workflows/dependabot/dependabot-updates/badge.svg)](https://github.com/Tombo1001/carsearch/network/updates)
+[![Dependabot](https://github.com/Tombo1001/carsearch/actions/workflows/dependabot/dependabot-updates/badge.svg)](https://github.com/Tombo1001/carsearch/actions/workflows/dependabot/dependabot-updates)
 
 **What would an older car actually cost you?** Load your own Google Timeline
 export, pick a car, and see which UK clean-air, low-emission and congestion zones
