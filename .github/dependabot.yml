@@ -1,0 +1,57 @@
+# Dependency updates.
+#
+# npm minor and patch releases arrive as one grouped pull request a week. The CI
+# workflow builds it and, if the build passes, merges it and redeploys: nobody
+# has to look at it. Major versions get a pull request each and wait for a
+# person, because that is where the breaking changes are (maplibre-gl 6 needed a
+# worker URL that only a browser test caught).
+#
+# GitHub Actions and Docker base images are checked monthly and also wait for a
+# person: a merge made with the workflow token cannot change workflow files.
+#
+# Security fixes are handled separately by Dependabot security updates (repo
+# settings) and take the same path: non-major ones merge themselves.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: tuesday
+      time: '06:47'
+      timezone: Europe/London
+    # Give a new release a few days on the registry before taking it, so a
+    # hijacked publish is likely to be caught and pulled first.
+    cooldown:
+      default-days: 3
+      semver-major-days: 14
+    groups:
+      npm-minor:
+        update-types: [minor, patch]
+      npm-security:
+        applies-to: security-updates
+        update-types: [minor, patch]
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: deps
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ['*']
+    commit-message:
+      prefix: ci
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: docker

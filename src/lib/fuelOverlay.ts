@@ -1,4 +1,4 @@
-import type maplibregl from 'maplibre-gl'
+import type * as maplibregl from 'maplibre-gl'
 import { clipLeader, layoutLabels, leaderEnd, weekChange, type FuelData, type MapFuel, type Rect, type RegionShapes } from './fuel'
 
 /**

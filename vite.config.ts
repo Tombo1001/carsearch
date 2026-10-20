@@ -38,7 +38,8 @@ function tileOrigin(template: string): string {
  *   img-src             - our own assets, plus the tile host for good measure,
  *                         plus the blob: and data: URLs MapLibre generates as it
  *                         hands decoded tiles to the canvas.
- *   worker-src blob:    - MapLibre runs its tile work in a blob worker.
+ *   worker-src 'self'   - MapLibre runs its tile work in a worker, which Vite
+ *                         emits as a file of our own (see MapView.tsx).
  *   style-src 'unsafe-inline' - React `style={{...}}` renders inline style
  *                         attributes and MapLibre's controls do the same. This is
  *                         the one loosened directive; it permits styling, not
@@ -59,7 +60,7 @@ function csp(tileUrl: string): string {
     `img-src 'self' data: blob:${origin ? ` ${origin}` : ''}`,
     "font-src 'self'",
     `connect-src 'self'${origin ? ` ${origin}` : ''}`,
-    "worker-src 'self' blob:",
+    "worker-src 'self'",
     "manifest-src 'self'",
   ].join('; ')
 }
@@ -109,10 +110,12 @@ export default defineConfig(({ mode }) => {
     },
     server: { port: 5173, host: true },
     build: {
-      rollupOptions: {
+      rolldownOptions: {
         // MapLibre is the bulk of the bundle and changes far less often than the
         // app, so it gets its own long-lived chunk.
-        output: { manualChunks: { maplibre: ['maplibre-gl'] } },
+        output: {
+          codeSplitting: { groups: [{ name: 'maplibre', test: /node_modules[\\/]maplibre-gl[\\/]/ }] },
+        },
       },
     },
   }
