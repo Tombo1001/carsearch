@@ -16,7 +16,7 @@
     "data:fuel": "node scripts/build-fuel.mjs"
   },
   "dependencies": {
-    "maplibre-gl": "^6.15.0",
+    "maplibre-gl": "^6.16.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },
